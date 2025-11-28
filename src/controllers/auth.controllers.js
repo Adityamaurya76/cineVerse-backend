@@ -131,4 +131,29 @@ const adminLogin = asyncHandler(async (req, res) => {
   return res.status(200).cookie("accessToken", accessToken, options).cookie("refreshToken", refreshToken, options).json(new ApiResponse(200, { admin: adminData, accessToken, refreshToken }, "Admin logged in successfully"));
 });
 
-export { registerUser, userLogin, adminLogin}
+const logout = asyncHandler(async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(
+      req.user?._id,
+      { $set: { refreshToken: "" } },
+      { new: true }
+    );
+
+    const options = {
+      httpOnly: true,
+      secure: true
+    };
+
+    res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(new ApiResponse(200, {}, "User Logged Out"));
+      
+  } catch (error) {
+     console.error("🔥 Logout Error:", error);
+    throw new ApiError(500, "Something went wrong");
+  }
+});
+
+export { registerUser, userLogin, adminLogin, logout}

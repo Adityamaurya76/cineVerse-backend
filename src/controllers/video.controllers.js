@@ -6,7 +6,7 @@ import cloudinary from "../config/cloudinary.js";
 
 const videoList = asyncHandler(async (req, res) => {
     try{
-       const videos = await Video.find().select().sort({ createdAt: -1 })
+       const videos = await Video.find().populate("category", "name").sort({ createdAt: -1 })
 
        if(!videos) {
             return res.status(404).json(new ApiResponse(404, null, "Users not found"));
@@ -89,10 +89,9 @@ const videoDetials = asyncHandler(async (req, res) => {
      try {
         const video =await Video.findById(req.params.id);
         if(!video) {
-
             return res.status(404).json(new ApiResponse(200, "Video not found"));
         }
-       
+
         return res.status(200).json(new ApiResponse(200, video, "Video fetched successfully"));
     } catch (error) {
         throw new ApiError(500, 'Error while fetching categories', error);
