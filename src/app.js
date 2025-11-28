@@ -14,10 +14,11 @@ app.use(express.urlencoded({
 app.use(express.static("public"));
 app.use(cookieParser());
 
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : [process.env.PRODUCTION_ORIGIN];
 // cors configurations
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN?.split(","),
+    origin: allowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
