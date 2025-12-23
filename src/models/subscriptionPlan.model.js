@@ -9,6 +9,12 @@ const subscriptionPlanSchema = new Schema(
       trim: true,
     },
 
+    billingPeriod: {
+      type: String,
+      enum: ["monthly", "yearly"],
+      required: true,
+    },
+
     description: {
       type: String,
       trim: true,
@@ -23,6 +29,11 @@ const subscriptionPlanSchema = new Schema(
       type: Number,
       required: [true, "Duration is required"],
       default: 30,
+    },
+
+    discountPercentage: {
+      type: Number,
+      default: 0,
     },
 
     videoQuality: {

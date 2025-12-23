@@ -53,13 +53,24 @@ const userCreate = asyncHandler(async (req, res) => {
 
 const userDetials = asyncHandler(async (req, res) => {
    try{
-        const user = await User.findById(req.params.id).populate();
+        const user = await User.findById(req.params.id).select("-password -refreshToken -emailVerificationToken -emailVerificationExpiry");
     
         if(!user) {
             return res.status(404).json(new ApiResponse(404, null, "User not found")); 
         }
 
-       return res.status(200).json(new ApiResponse(200, user, "Users fetched successfully"));
+        // Fetch active subscription for this user
+        const { Subscription } = await import("../models/subscription.model.js");
+        const subscription = await Subscription.findOne({ user: user._id, status: "active" })
+          .populate("plan", "name price durationInDays billingCycle description")
+          .sort({ createdAt: -1 })
+          .lean();
+
+        // Convert user to plain object and add subscription
+        const userObject = user.toObject();
+        userObject.subscription = subscription || null;
+
+       return res.status(200).json(new ApiResponse(200, userObject, "Users fetched successfully"));
    } catch (error) {
        throw new ApiError(500, 'Error while fetching Users', error);
     }   
@@ -74,13 +85,13 @@ const updateUser = asyncHandler(async(req, res) => {
            return res.status(404).json(new ApiResponse(404, null, "User not found"));
         }
 
-        if(username) User.username = username;
-        if(fullName) User.fullName = fullName;
-        if(email) User.email = email;
+        if(username) user.username = username;
+        if(fullName) user.fullName = fullName;
+        if(email) user.email = email;
 
         if(req.file) {
             
-            if(User.avatar?.localPath) {
+            if(user.avatar?.localPath) {
                 await cloudinary.uploader.destroy(user.avatar.localPath);
             }
             

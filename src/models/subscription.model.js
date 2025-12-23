@@ -14,6 +14,21 @@ const subscriptionSchema = new Schema(
       required: true,
     },
 
+    stripeSessionId: {
+      type: String,
+      default: null 
+    },
+
+    stripeCustomerId: {
+      type: String,
+      default: null 
+    },
+
+    stripeSubscriptionId: {
+      type: String,
+      default: null 
+    },
+
     startDate: {
       type: Date,
       default: Date.now,
@@ -26,12 +41,13 @@ const subscriptionSchema = new Schema(
 
     status: {
       type: String,
-      enum: ["active", "expired", "cancelled"],
+      enum: ["active", "expired", "cancelled", "past_due", "incomplete"],
       default: "active",
     },
 
     paymentId: {
-      type: String, // from your payment gateway (Stripe, Razorpay, etc.)
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
       default: null,
     },
 
@@ -45,9 +61,8 @@ const subscriptionSchema = new Schema(
   }
 );
 
-// Automatically expire subscription if current date > endDate
 subscriptionSchema.methods.isExpired = function () {
   return new Date() > this.endDate;
 };
 
-export const subscription = mongoose.model("Subscription", subscriptionSchema);
+export const Subscription = mongoose.model("Subscription", subscriptionSchema);

@@ -52,7 +52,7 @@ const registerUser = asyncHandler(async (req, res) => {
     const user = new User({username, fullName, password, email, role, avatar: avatarData})
     const {unHashedToken, hashedToken, tokenExpiry } = user.generateTemporaryToken();
     user.emailVerificationToken = hashedToken;
-    user.emailVerificationToken = tokenExpiry;
+    user.emailVerificationExpiry = tokenExpiry;
     await  user.save({ validateBeforeSave: false });
 
     await sendEmail({
@@ -133,25 +133,16 @@ const adminLogin = asyncHandler(async (req, res) => {
 
 const logout = asyncHandler(async (req, res) => {
   try {
-    await User.findByIdAndUpdate(
-      req.user?._id,
-      { $set: { refreshToken: "" } },
-      { new: true }
-    );
+    await User.findByIdAndUpdate(req.user?._id, { $set: { refreshToken: "" } }, { new: true });
 
     const options = {
       httpOnly: true,
       secure: true
     };
 
-    res
-      .status(200)
-      .clearCookie("accessToken", options)
-      .clearCookie("refreshToken", options)
-      .json(new ApiResponse(200, {}, "User Logged Out"));
-      
+    res.status(200).clearCookie("accessToken", options).clearCookie("refreshToken", options).json(new ApiResponse(200, {}, "User Logged Out"));  
   } catch (error) {
-     console.error("🔥 Logout Error:", error);
+     console.error("Logout Error:", error);
     throw new ApiError(500, "Something went wrong");
   }
 });

@@ -7,7 +7,7 @@ dotenv.config({
 });
 
 import cloudinary from './config/cloudinary.js';
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT);
 
 connectDB().then(() => {
    app.listen(port, () => {
