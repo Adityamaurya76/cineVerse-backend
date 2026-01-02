@@ -5,13 +5,13 @@ import { Category} from '../models/category.model.js';
 import { Video } from '../models/video.models.js';
 
 const list = asyncHandler(async (req, res) => {
-  const  {  category, type, isPremium, search, sort, page , limit} = req.query;
-  let filter = {};
+  const  {  category, type, isPremium, search, sort, page = 1, limit = 10} = req.query;
+  let videoFilter = {};
 
-  if (category) filter.category = category;
-  if (type) filter.type = type;
-  if (isPremium !== undefined) filter.isPremium = isPremium === 'true';
-  if (search) filter.title = { $regex: search, $options: 'i' };
+  if (category) videoFilter.category = category;
+  if (type) videoFilter.type = type;
+  if (isPremium !== undefined) videoFilter.isPremium = isPremium === 'true';
+  if (search) videoFilter.title = { $regex: search, $options: 'i' };
 
   let sortQuery = {};
   if (sort === 'latest') sortQuery.releaseDate = -1;
@@ -21,9 +21,9 @@ const list = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const categories =await Category.find().lean();
-  const trending = await Video.find().sort({ views: -1}).limit(20).lean();
-  const newReleases = await Video.find().sort({ releaseDate: -1}).limit(20).lean();
-  const heroMovie = await Video.findOne().sort({ views: -1 }).lean();
+  const trending = await Video.find(videoFilter).sort({ views: -1}).limit(20).lean();
+  const newReleases = await Video.find(videoFilter).sort({ releaseDate: -1}).limit(20).lean();
+  const heroMovie = await Video.findOne(videoFilter).sort({ views: -1 }).lean();
 
   return res.json(new ApiResponse(200, { hero: heroMovie, categories, trending, newReleases }, "Movie fetched successfully")); 
 });

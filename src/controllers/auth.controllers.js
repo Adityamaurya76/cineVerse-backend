@@ -1,94 +1,123 @@
-import { User} from '../models/user.models.js';
-import {ApiResponse} from '../utils/api-response.js'
-import {ApiError} from '../utils/api-error.js'
+import { User } from '../models/user.models.js';
+import { ApiResponse } from '../utils/api-response.js'
+import { ApiError } from '../utils/api-error.js'
 import { asyncHandler } from '../utils/async-handler.js'
 import { emailVerificationMailgenContent, forgotPasswordMailgenContent, sendEmail } from '../utils/mail.js';
 import jwt from 'jsonwebtoken';
 import cloudinary from '../config/cloudinary.js';
 import fs from 'fs';
+import crypto from 'crypto';
 
 
-const generateAccessAndRefreshToken = async (userId) =>{
-    try{
-        const user = await User.findById(userId);
-        const accessToken = user.generateAccessToken();
-        const refreshToken = user.generateRefreshToken();
+const generateAccessAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
 
-        user.refreshToken = refreshToken;
-        await user.save({ validateBeforeSave: false });
-        return { accessToken, refreshToken };
-    } catch (error) {
-        throw new ApiError(500, 'Something went wrong while generating access token');
-    }
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(500, 'Something went wrong while generating access token');
+  }
 }
 
 const registerUser = asyncHandler(async (req, res) => {
-    const { username, fullName, password, email, role } = req.body;
+  const { username, fullName, password, email, role } = req.body;
 
-    const existingUser = await User.findOne({
-        $or: [{ email }, { username }] 
+  const existingUser = await User.findOne({
+    $or: [{ email }, { username }]
+  });
+
+  if (existingUser) {
+    throw new ApiError(400, 'User with email or username already exists', []);
+  }
+
+  let avatarData = {
+    url: "https://placehold.co/200x200",
+    localPath: "",
+  };
+
+  if (req.file) {
+    const cloudImg = await cloudinary.uploader.upload(req.file.path, {
+      folder: "avatars",
     });
 
-    if(existingUser) {
-        throw new ApiError(400, 'User with email or username already exists', []);
+    avatarData = {
+      url: cloudImg.secure_url,
+      localPath: cloudImg.public_id
     }
+  }
 
-    let avatarData = {
-        url: "https://placehold.co/200x200",
-        localPath: "",
-    };
-   
-    if(req.file) {
-      const cloudImg = await cloudinary.uploader.upload(req.file.path, {
-        folder:"avatars",
-      });
+  const user = new User({ username, fullName, password, email, role, avatar: avatarData })
+  const { unHashedToken, hashedToken, tokenExpiry } = user.generateTemporaryToken();
+  user.emailVerificationToken = hashedToken;
+  user.emailVerificationExpiry = tokenExpiry;
+  await user.save({ validateBeforeSave: false });
 
-      avatarData = {
-        url: cloudImg.secure_url,
-        localPath: cloudImg.public_id
-      }
-    }
+  await sendEmail({
+    email: user?.email,
+    subject: "Please verify your email",
+    mailgenContent: emailVerificationMailgenContent(
+      user.username,
+      `${req.protocol}://${req.get("host")}/api/v1/auth/verify-email/${unHashedToken}`,
+    ),
+  })
 
-    const user = new User({username, fullName, password, email, role, avatar: avatarData})
-    const {unHashedToken, hashedToken, tokenExpiry } = user.generateTemporaryToken();
-    user.emailVerificationToken = hashedToken;
-    user.emailVerificationExpiry = tokenExpiry;
-    await  user.save({ validateBeforeSave: false });
+  const createUser = await User.findById(user._id).select("-password -refreshToken -emailVerificationToken -emailVerificationExpiry",);
 
-    await sendEmail({
-        email: user?.email,
-        subject: "Please verify your email",
-        mailgenContent: emailVerificationMailgenContent(
-            user.username,
-            `${req.protocol}://${req.get("host")}/api/v1/users/verify-email/${unHashedToken}`,
-        ),
-    })
+  if (!createUser) {
+    throw new ApiError(500, "Something went wrong while registering a user");
+  }
 
-    const createUser = await User.findById(user._id).select( "-password -refreshToken -emailVerificationToken -emailVerificationExpiry",);
+  return res.status(201).json(new ApiResponse(200, { user: createUser }, "User registered successfully and verification email has been sent on your email",));
+});
 
-    if(!createUser) {
-        throw new ApiError(500, "Something went wrong while registering a user");
-    }
 
-    return res.status(201).json(new ApiResponse(200,{user: createUser}, "User registered successfully and verification email has been sent on your email",));
+const verifyEmail = asyncHandler(async (req, res) => {
+  const { verificationToken } = req.params;
+
+  if (!verificationToken) {
+    throw new ApiError(400, "Email verification token is missing");
+  }
+
+  let hashedToken = crypto.createHash("sha256").update(verificationToken).digest("hex");
+
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpiry: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.redirect(`${process.env.FRONTEND_URL}/email-verification-failed`);
+  }
+
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpiry = undefined;
+  user.isEmailVerified = true;
+  await user.save({ validateBeforeSave: false });
+
+  //return res.status(200).json(new ApiResponse(200, { isEmailVerified: true }, "Email is verified"));
+  return res.redirect(`${process.env.FRONTEND_URL}/email-verified`);
 });
 
 const userLogin = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  if(!email){
+  if (!email) {
     throw new ApiError(400, "email is required");
   }
 
   const user = await User.findOne({ email });
 
-  if(!user) {
+  if (!user) {
     throw new ApiError(400, "User does not exists");
   }
- 
+
   const isPasswordvalid = await user.isPasswordCorrect(password);
 
-  if(!isPasswordvalid){
+  if (!isPasswordvalid) {
     throw new ApiError(400, "Invalid credentials");
   }
 
@@ -103,7 +132,7 @@ const userLogin = asyncHandler(async (req, res) => {
     secure: true,
   }
 
-  return res.status(200).cookie("accessToken", accessToken, options).cookie("refreshToken", refreshToken, options).json(new ApiResponse(200, {user:loggedInUser, accessToken, refreshToken}, "User loggedin Successfully"))
+  return res.status(200).cookie("accessToken", accessToken, options).cookie("refreshToken", refreshToken, options).json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, "User loggedin Successfully"))
 })
 
 const adminLogin = asyncHandler(async (req, res) => {
@@ -140,11 +169,11 @@ const logout = asyncHandler(async (req, res) => {
       secure: true
     };
 
-    res.status(200).clearCookie("accessToken", options).clearCookie("refreshToken", options).json(new ApiResponse(200, {}, "User Logged Out"));  
+    res.status(200).clearCookie("accessToken", options).clearCookie("refreshToken", options).json(new ApiResponse(200, {}, "User Logged Out"));
   } catch (error) {
-     console.error("Logout Error:", error);
+    console.error("Logout Error:", error);
     throw new ApiError(500, "Something went wrong");
   }
 });
 
-export { registerUser, userLogin, adminLogin, logout}
+export { registerUser, userLogin, adminLogin, verifyEmail, logout }
