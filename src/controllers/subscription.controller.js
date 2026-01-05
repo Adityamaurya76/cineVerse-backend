@@ -66,8 +66,8 @@ const createCheckoutSession = asyncHandler(async (req, res) => {
         userId: userId,
       },
     },
-    success_url: `${process.env.FRONTEND_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.FRONTEND_URL}/payment-failed`,
+    success_url: `${process.env.CORS_ORIGIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.CORS_ORIGIN}/payment-failed`,
   });
 
   payment.stripeSessionId = session.id;
