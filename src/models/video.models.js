@@ -31,7 +31,7 @@ const videoSchema = new Schema(
 
     type: {
       type: String,
-      enum: ["movie", "series"],
+      enum: ["movie", "series", "documentary"],
       required: true,
       default: "movie",
     },
@@ -48,6 +48,11 @@ const videoSchema = new Schema(
     },
 
     duration: {
+      type: Number,
+      default: 0,
+    },
+
+    totalSeasons: {
       type: Number,
       default: 0,
     },
@@ -74,6 +79,40 @@ const videoSchema = new Schema(
       default: false,
     },
 
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+
+    tags: {
+      type: [String],
+      default: [],
+    },
+
+    seasons: [
+      {
+        seasonNumber: Number,
+        title: String,
+        thumbnail: {
+          url: String,
+          localPath: String,
+        },
+        episodes: [
+          {
+            episodeNumber: Number,
+            title: String,
+            description: String,
+            duration: Number,
+            videoUrl: String,
+            thumbnail: {
+              url: String,
+              localPath: String,
+            },
+          },
+        ],
+      },
+    ],
+
     views: {
       type: Number,
       default: 0,
@@ -95,7 +134,7 @@ const videoSchema = new Schema(
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User", 
+      ref: "User",
       default: null,
     },
   },
