@@ -41,6 +41,7 @@ import dashboardRoute from './routes/dashboard.routes.js';
 import homeRoute from './routes/home.routes.js';
 import movieRoute from './routes/movie.routes.js';
 import browseRoute from './routes/browse.routes.js';
+import myListRoute from './routes/myList.routes.js';
 
 // use the routes
 app.use('/api/v1/healthcheck', healthcheckRoutes);
@@ -54,6 +55,7 @@ app.use('/api/v1/dashboard', dashboardRoute);
 app.use('/api/v1/home', homeRoute);
 app.use('/api/v1/movie', movieRoute);
 app.use('/api/v1/browse', browseRoute);
+app.use('/api/v1/my-list', myListRoute);
 
 app.get("/", (req, res) => {
     res.send("welcome to video streaming webisite");
