@@ -1,4 +1,5 @@
 import { User } from '../models/user.models.js';
+import { Subscription } from '../models/subscription.model.js';
 import { ApiResponse } from '../utils/api-response.js'
 import { ApiError } from '../utils/api-error.js'
 import { asyncHandler } from '../utils/async-handler.js'
@@ -113,20 +114,20 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email is already verified");
   }
 
-   const { unHashedToken, hashedToken, tokenExpiry } = user.generateTemporaryToken();
-   user.emailVerificationToken = hashedToken;
-   user.emailVerificationExpiry = tokenExpiry;
+  const { unHashedToken, hashedToken, tokenExpiry } = user.generateTemporaryToken();
+  user.emailVerificationToken = hashedToken;
+  user.emailVerificationExpiry = tokenExpiry;
 
-   await user.save({ validateBeforeSave: false });
+  await user.save({ validateBeforeSave: false });
 
-   await sendEmail({
-     email: user?.email,
-     subject: "Please verify your email",
-     mailgenContent: emailVerificationMailgenContent(
-       user.username,
-       `${req.protocol}://${req.get("host")}/api/v1/auth/verify-email/${unHashedToken}`,
-     ),
-   });
+  await sendEmail({
+    email: user?.email,
+    subject: "Please verify your email",
+    mailgenContent: emailVerificationMailgenContent(
+      user.username,
+      `${req.protocol}://${req.get("host")}/api/v1/auth/verify-email/${unHashedToken}`,
+    ),
+  });
 
   return res.status(200).json(new ApiResponse(200, {}, "Verification email resent successfully"));
 });
@@ -134,19 +135,19 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
 const refreshToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
-  if(!incomingRefreshToken) {
+  if (!incomingRefreshToken) {
     throw new ApiError(400, "Unauthorized access, refresh token is missing");
   }
 
   try {
     const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
-    
+
     const user = await User.findById(decodedToken?._id);
 
-    if(!user) {
+    if (!user) {
       throw new ApiError(401, "Invalid refresh token");
     }
-   
+
     if (incomingRefreshToken !== user?.refreshToken) {
       throw new ApiError(401, "Refresh token in expired");
     }
@@ -162,7 +163,7 @@ const refreshToken = asyncHandler(async (req, res) => {
     await user.save();
 
     return res.status(200).cookie("accessToken", accessToken, options).cookie("refreshToken", newRefreshToken, options).json(new ApiResponse(200, { accessToken, refreshToken: newRefreshToken }, "Access token refreshed"));
-  } catch(error) {
+  } catch (error) {
     throw new ApiError(401, "Invalid refresh token");
   }
 })
@@ -192,12 +193,22 @@ const userLogin = asyncHandler(async (req, res) => {
     "-password -refreshToken -emailVerificationToken -emailVerificationExpiry",
   )
 
+  // Fetch active subscription for this user
+  const subscription = await Subscription.findOne({ user: user._id, status: "active" })
+    .populate("plan", "name price durationInDays billingCycle description")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const userObject = loggedInUser.toObject();
+  userObject.subscription = subscription || null;
+  userObject.isSubscribed = !!subscription;
+
   const options = {
-    htthOnly: true,
+    httpOnly: true,
     secure: true,
   }
 
-  return res.status(200).cookie("accessToken", accessToken, options).cookie("refreshToken", refreshToken, options).json(new ApiResponse(200, { user: loggedInUser, accessToken, refreshToken }, "User loggedin Successfully"))
+  return res.status(200).cookie("accessToken", accessToken, options).cookie("refreshToken", refreshToken, options).json(new ApiResponse(200, { user: userObject, accessToken, refreshToken }, "User loggedin Successfully"))
 })
 
 const adminLogin = asyncHandler(async (req, res) => {
